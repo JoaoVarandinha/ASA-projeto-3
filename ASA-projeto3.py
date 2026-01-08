@@ -1,10 +1,10 @@
 import sys
-from pulp import LpProblem, LpVariable, LpMinimize, LpBinary, LpMaximize, lpSum, LpStatus, value
+from pulp import *
 
 def readInput():
-    data = sys.stdin.read().strip.split('\n')
+    data = sys.stdin.read().strip().split('\n')
     if not data or not data[0].strip():
-        return None, None
+        return None, None, None
     
     num_teams, num_games_played = map(int, data[0].split())
 
@@ -16,7 +16,7 @@ def readInput():
         home, visitor, result = map(int, data[i].split())
         games_played[(home, visitor)] = result
 
-        if result == 1:
+        if result == 0:
             current_points[home] += 1
             current_points[visitor] += 1
         elif result == home:
@@ -41,10 +41,16 @@ def minGamesWin(team_id,teams, games_played, current_points, remaining_games):
     # Calculate the maximum number of games the team can still win
     max_wins = sum(1 for (home, visitor) in remaining_games if home == team_id or visitor == team_id)
 
-    i, j = 0, max_wins
+    left, right = 0, max_wins
     best_num_wins = -1
 
-    while i <= j:
+    while left <= right:
+        middle = (left + right) // 2
+        if teamCanWinWithWins(team_id, teams, games_played, current_points, remaining_games, middle):
+            best_num_wins = middle
+            right = middle - 1
+        else:
+            left = middle + 1
 
     return best_num_wins  
 
@@ -79,12 +85,22 @@ def teamCanWinWithWins(team_id, teams, games_played, current_points, remaining_g
 
         for (home, visitor) in remaining_games:
             if home == t:
-                points += 3 * win_home[(home, visitor)]
+                points += 3 * win_home[(home, visitor)] + 1 * draw[(home, visitor)]
             elif visitor == t:
-                points += 3 * win_visitor[(home, visitor)]
+                points += 3 * win_visitor[(home, visitor)] + 1 * draw[(home, visitor)]
         
         final_team_points[t] = points
-        # FIX ME - Restrição
+
+        if t != team_id:
+            prob += final_team_points[team_id] >= final_team_points[t]
+        
+    # Minimize points of other teams (favorable scenario)
+    prob += lpSum([final_team_points[t] for t in range(1, teams + 1) if t != team_id])
+
+    prob.solve()
+
+    # Check if the solution is optimal (feasible)
+    return LpStatus[prob.status] == 'Optimal'
 
     
 
@@ -95,3 +111,12 @@ def main():
         return
     
     remaining_games = getRemainingGames(teams, games_played)
+
+    results = []
+
+    for team_id in range(1, teams + 1):
+        min_wins = minGamesWin(team_id, teams, games_played, current_points, remaining_games)
+        results.append(min_wins)
+    
+    for result in results:
+        print(result)
