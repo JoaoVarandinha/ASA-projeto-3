@@ -22,33 +22,35 @@ def readInput():
 
 def getRemainingGames(teams, games_played):
     remaining_games = []
-
     for i in range(1, teams + 1):
         for j in range(1, teams + 1):
             if i != j and (i,j) not in games_played:
                 remaining_games.append((i, j))
-
     return remaining_games
 
-def minGamesWin(team_id, teams, current_points, remaining_games):
-    # List of games involving this team
-    team_games = [(h, v) for h, v in remaining_games if h == team_id or v == team_id]
-    max_wins = len(team_games)  # upper bound of wins
+def minGamesWin(team_id, teams, current_points, remaining_games, max_wins):
+    for t in range(1, teams + 1):
+        if t == team_id: continue
+        if current_points[t] >= (current_points[team_id] + 3 * max_wins[team_id]):
+            return -1
+        games_between = [(h, v) for h, v in remaining_games if (h == t or v == t) and (h != team_id and v != team_id)] #Check cause may be stupid
+        max_points_t = current_points[t] + 3 * len(games_between)
+        if max_points_t < current_points[team_id]:
+            continue
 
-    # Binary search over possible number of wins
+
+    left, right = 0, max_wins[team_id]
     best_num_wins = -1
-    left, right = 0, max_wins
 
     while left <= right:
         mid = (left + right) // 2
         if teamCanWinWithWins(team_id, teams, current_points, remaining_games, mid):
-            best_num_wins = mid      # feasible, try fewer wins
+            best_num_wins = mid
             right = mid - 1
         else:
-            left = mid + 1           # not feasible, try more wins
+            left = mid + 1
 
-    return best_num_wins  # -1 if impossible
-
+    return best_num_wins
 
 def teamCanWinWithWins(team_id, teams, current_points, remaining_games, num_wins):
     # Max possible wins
@@ -58,42 +60,41 @@ def teamCanWinWithWins(team_id, teams, current_points, remaining_games, num_wins
 
     prob = LpProblem(f"Team_{team_id}_can_win", LpMinimize)
 
-    # Binary variables per game
+    # Only two binary variables per game: home_win and draw
     win_home = {}
-    win_visitor = {}
     draw = {}
     for h, v in remaining_games:
-        win_home[(h, v)] = LpVariable(f"home_{h}_{v}", cat=LpBinary)
-        win_visitor[(h, v)] = LpVariable(f"visitor_{h}_{v}", cat=LpBinary)
-        draw[(h, v)] = LpVariable(f"draw_{h}_{v}", cat=LpBinary)
-        prob += win_home[(h, v)] + draw[(h, v)] + win_visitor[(h, v)] == 1  # exactly one outcome
+        win_home[(h,v)] = LpVariable(f"home_{h}_{v}", cat=LpBinary)
+        draw[(h,v)] = LpVariable(f"draw_{h}_{v}", cat=LpBinary)
+        # If both are 0 → visitor wins
+        prob += win_home[(h,v)] + draw[(h,v)] <= 1
 
     # The team must win exactly num_wins games
     team_wins = []
     for h, v in team_games:
         if h == team_id:
-            team_wins.append(win_home[(h, v)])
-        else:
-            team_wins.append(win_visitor[(h, v)])
+            team_wins.append(win_home[(h,v)])
+        else:  # visitor is the team
+            team_wins.append(1 - win_home[(h,v)] - draw[(h,v)])
     prob += lpSum(team_wins) == num_wins
 
-    # Calculate final points for all teams
+    # Calculate final points for each team
     final_points = {}
     for t in range(1, teams + 1):
         points = current_points[t]
         for h, v in remaining_games:
             if t == h:
-                points += 3 * win_home[(h, v)] + 1 * draw[(h, v)]
+                points += 3 * win_home[(h,v)] + 1 * draw[(h,v)]
             elif t == v:
-                points += 3 * win_visitor[(h, v)] + 1 * draw[(h, v)]
+                points += 3 * (1 - win_home[(h,v)] - draw[(h,v)]) + 1 * draw[(h,v)]
         final_points[t] = points
 
-    # Team must have at least as many points as all other teams
+    # Team must tie or beat all other teams
     for t in range(1, teams + 1):
         if t != team_id:
             prob += final_points[team_id] >= final_points[t]
 
-    # Objective (dummy, just minimize others’ points)
+    # Dummy objective
     prob += lpSum([final_points[t] for t in range(1, teams + 1) if t != team_id])
 
     prob.solve(PULP_CBC_CMD(msg=0))
@@ -103,11 +104,13 @@ def main():
     teams, games_played, current_points = readInput()
     remaining_games = getRemainingGames(teams, games_played)
 
-    results = []
-    for team_id in range(1, teams + 1):
-        results.append(minGamesWin(team_id, teams, current_points, remaining_games))
+    max_wins = [0] * (teams + 1)
+    # Games involving the team
+    for t in range(1, teams + 1):
+        team_games = [(h, v) for h, v in remaining_games if h == t or v == t]
+        max_wins[t] = len(team_games)
 
-    for r in results:
-        print(r)
+    for team_id in range(1, teams + 1):
+        print(minGamesWin(team_id, teams, current_points, remaining_games, max_wins))
 
 main()

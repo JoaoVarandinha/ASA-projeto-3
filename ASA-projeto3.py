@@ -4,9 +4,8 @@ from pulp import *
 def readInput():
     num_teams, num_games_played = map(int, sys.stdin.readline().split())
 
-    teams = num_teams
     games_played = {}
-    current_points = [0] * (teams + 1)
+    current_points = [0] * (num_teams + 1)
 
     for i in range(1, num_games_played + 1):
         home, visitor, result = map(int, sys.stdin.readline().split())
@@ -20,7 +19,7 @@ def readInput():
         elif result == visitor:
             current_points[visitor] += 3
     
-    return teams, games_played, current_points
+    return num_teams, games_played, current_points
 
 def getRemainingGames(teams, games_played):
     remaining_games = []
@@ -42,7 +41,7 @@ def minGamesWin(team_id,teams, games_played, current_points, remaining_games):
 
     while left <= right:
         middle = (left + right) // 2
-        if teamCanWinWithWins(team_id, teams, games_played, current_points, remaining_games, middle):
+        if teamCanWinWithWins(team_id, teams, current_points, remaining_games, middle):
             best_num_wins = middle
             right = middle - 1
         else:
@@ -51,7 +50,7 @@ def minGamesWin(team_id,teams, games_played, current_points, remaining_games):
     return best_num_wins  
 
 
-def teamCanWinWithWins(team_id, teams, games_played, current_points, remaining_games, num_wins):
+def teamCanWinWithWins(team_id, teams, current_points, remaining_games, num_wins):
 
     max_wins = sum(1 for (home, visitor) in remaining_games if home == team_id or visitor == team_id)
     if num_wins > max_wins:
