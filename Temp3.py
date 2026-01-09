@@ -2,17 +2,14 @@ import sys
 from pulp import *
 
 def readInput():
-    data = sys.stdin.read().strip().split('\n')
-    if not data or not data[0].strip():
-        return None, None, None
-    
-    num_teams, num_games_played = map(int, data[0].split())
+    num_teams, num_games_played = map(int, sys.stdin.readline().split())
 
+    teams = num_teams
     games_played = {}
-    current_points = [0] * (num_teams + 1)
+    current_points = [0] * (teams + 1)
 
     for i in range(1, num_games_played + 1):
-        home, visitor, result = map(int, data[i].split())
+        home, visitor, result = map(int, sys.stdin.readline().split())
         games_played[(home, visitor)] = result
 
         if result == 0:
@@ -23,7 +20,7 @@ def readInput():
         elif result == visitor:
             current_points[visitor] += 3
     
-    return num_teams, games_played, current_points
+    return teams, games_played, current_points
 
 def getRemainingGames(teams, games_played):
     remaining_games = []
@@ -55,26 +52,33 @@ def minGamesWin(team_id,teams, games_played, current_points, remaining_games):
 
 
 def teamCanWinWithWins(team_id, teams, games_played, current_points, remaining_games, num_wins):
+
+    max_wins = sum(1 for (home, visitor) in remaining_games if home == team_id or visitor == team_id)
+    if num_wins > max_wins:
+        return False
+
     # Create the LP problem
     prob = LpProblem(f"Team_{team_id}_can_win", LpMinimize)
 
     # Variables for game outcomes (home wins, visitor wins, draw)
-    win = {}
+    win_home = {}
+    win_visitor = {}
     draw = {}
 
     for (home, visitor) in remaining_games:
-        win[(home, visitor)] = LpVariable(f"win_home_{home}_{visitor}", cat = LpBinary)
+        win_home[(home, visitor)] = LpVariable(f"win_home_{home}_{visitor}", cat = LpBinary)
+        win_visitor[(home, visitor)] = LpVariable(f"win_visitor_{home}_{visitor}", cat = LpBinary)
         draw[(home, visitor)] = LpVariable(f"draw_{home}_{visitor}", cat = LpBinary)
 
         # Each game has exactly one outcome
-        prob += win[(home, visitor)] + draw[(home, visitor)] <= 1
+        prob += win_home[(home, visitor)] + win_visitor[(home, visitor)] + draw[(home, visitor)] == 1
 
     # The team (team_id) must achieve exactly num_wins in the remaining games
-    team_wins = lpSum([win[(home, visitor)] for (home, visitor) in remaining_games if home == team_id] +
-                      [(1 - win[(home, visitor)] - draw[(home, visitor)]) for (home, visitor) in remaining_games if visitor == team_id])
-    prob += team_wins >= num_wins
+    team_wins = lpSum([win_home[(home, visitor)] for (home, visitor) in remaining_games if home == team_id] +
+                      [win_visitor[(home, visitor)] for (home, visitor) in remaining_games if visitor == team_id])
+    prob += team_wins == num_wins
 
-    # Calculate final points for each team
+    # Calculate final poins for each team
     final_team_points = {}
 
     for t in range(1, teams + 1):
@@ -82,25 +86,24 @@ def teamCanWinWithWins(team_id, teams, games_played, current_points, remaining_g
 
         for (home, visitor) in remaining_games:
             if home == t:
-                points += 3 * win[(home, visitor)] + draw[(home, visitor)]
+                points += 3 * win_home[(home, visitor)] + 1 * draw[(home, visitor)]
             elif visitor == t:
-                points += 3 * (1- win[(home, visitor)] - draw[(home, visitor)]) + draw[(home, visitor)]
-
+                points += 3 * win_visitor[(home, visitor)] + 1 * draw[(home, visitor)]
+        
         final_team_points[t] = points
-    
+
     for t in range(1, teams + 1):
-        if team_id != t:
+        if t != team_id:
             prob += final_team_points[team_id] >= final_team_points[t]
-
+        
     # Minimize points of other teams (favorable scenario)
-    #prob += lpSum([final_team_points[t] for t in range(1, teams + 1) if t != team_id])
+    prob += lpSum([final_team_points[t] for t in range(1, teams + 1) if t != team_id])
 
-    prob.solve(PULP_CBC_CMD(msg=0))
+    prob.solve(pulp.PULP_CBC_CMD(msg=0))
 
     # Check if the solution is optimal (feasible)
     return LpStatus[prob.status] == 'Optimal'
-
-
+    
 
 def main():
     teams, games_played, current_points = readInput()
@@ -110,7 +113,13 @@ def main():
     
     remaining_games = getRemainingGames(teams, games_played)
 
+    results = []
+
     for team_id in range(1, teams + 1):
-        result = minGamesWin(team_id, teams, games_played, current_points, remaining_games)
+        min_wins = minGamesWin(team_id, teams, games_played, current_points, remaining_games)
+        results.append(min_wins)
+    
+    for result in results:
         print(result)
 
+main()

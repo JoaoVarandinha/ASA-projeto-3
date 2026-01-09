@@ -2,18 +2,14 @@ import sys
 from pulp import *
 
 def readInput():
-    data = sys.stdin.read().strip().split('\n')
-    if not data or not data[0].strip():
-        return None, None, None
-    
-    num_teams, num_games_played = map(int, data[0].split())
+    num_teams, num_games_played = map(int, sys.stdin.readline().split())
 
     teams = num_teams
     games_played = {}
     current_points = [0] * (teams + 1)
 
     for i in range(1, num_games_played + 1):
-        home, visitor, result = map(int, data[i].split())
+        home, visitor, result = map(int, sys.stdin.readline().split())
         games_played[(home, visitor)] = result
 
         if result == 0:
@@ -56,6 +52,11 @@ def minGamesWin(team_id,teams, games_played, current_points, remaining_games):
 
 
 def teamCanWinWithWins(team_id, teams, games_played, current_points, remaining_games, num_wins):
+
+    max_wins = sum(1 for (home, visitor) in remaining_games if home == team_id or visitor == team_id)
+    if num_wins > max_wins:
+        return False
+
     # Create the LP problem
     prob = LpProblem(f"Team_{team_id}_can_win", LpMinimize)
 
@@ -91,18 +92,18 @@ def teamCanWinWithWins(team_id, teams, games_played, current_points, remaining_g
         
         final_team_points[t] = points
 
+    for t in range(1, teams + 1):
         if t != team_id:
             prob += final_team_points[team_id] >= final_team_points[t]
         
     # Minimize points of other teams (favorable scenario)
     prob += lpSum([final_team_points[t] for t in range(1, teams + 1) if t != team_id])
 
-    prob.solve(PULP_CBC_CMD(msg=0))
+    prob.solve(pulp.PULP_CBC_CMD(msg=0))
 
     # Check if the solution is optimal (feasible)
     return LpStatus[prob.status] == 'Optimal'
-
-
+    
 
 def main():
     teams, games_played, current_points = readInput()
@@ -120,3 +121,5 @@ def main():
     
     for result in results:
         print(result)
+
+main()
