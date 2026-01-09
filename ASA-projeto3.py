@@ -20,7 +20,6 @@ def readInput():
 
     return num_teams, games_played, current_points
 
-
 def getRemainingGames(teams, games_played):
     remaining_games = []
     for i in range(1, teams + 1):
@@ -29,16 +28,13 @@ def getRemainingGames(teams, games_played):
                 remaining_games.append((i, j))
     return remaining_games
 
-
 def minGamesWin(team_id, teams, current_points, remaining_games, max_wins):
-    # ---------- PRUNING ----------
     for t in range(1, teams + 1):
         if t == team_id:
             continue
         if current_points[t] > current_points[team_id] + 3 * max_wins[team_id]:
             return -1
 
-    # ---------- BINARY SEARCH ----------
     left, right = 0, max_wins[team_id]
     best_num_wins = -1
 
@@ -51,7 +47,6 @@ def minGamesWin(team_id, teams, current_points, remaining_games, max_wins):
             left = mid + 1
 
     return best_num_wins
-
 
 def teamCanWinWithWins(team_id, teams, current_points, remaining_games, num_wins):
     team_games = [(h, v) for h, v in remaining_games if h == team_id or v == team_id]
@@ -99,7 +94,6 @@ def teamCanWinWithWins(team_id, teams, current_points, remaining_games, num_wins
     prob.solve(PULP_CBC_CMD(msg=0))
     return LpStatus[prob.status] == 'Optimal'
 
-
 def main():
     teams, games_played, current_points = readInput()
     remaining_games = getRemainingGames(teams, games_played)
@@ -110,6 +104,5 @@ def main():
 
     for team_id in range(1, teams + 1):
         print(minGamesWin(team_id, teams, current_points, remaining_games, max_wins))
-
 
 main()
